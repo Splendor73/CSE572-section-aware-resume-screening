@@ -1,0 +1,37 @@
+# Data
+data/raw/
+data/processed/
+*.csv
+*.json
+*.xlsx
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+*.egg
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+CLAUDE.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Results (keep structure, ignore large outputs)
+results/*.pkl
+results/*.joblib
+
+# Environment
+.env
