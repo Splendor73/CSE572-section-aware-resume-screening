@@ -35,3 +35,8 @@ results/*.joblib
 
 # Environment
 .env
+AGENTS.md
+graphify-out/graph.html
+
+graphify-out/.graphify_python
+graphify-out/GRAPH_REPORT.md
