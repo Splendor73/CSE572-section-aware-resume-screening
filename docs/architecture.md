@@ -36,9 +36,10 @@ the whole pipeline looks like this:
           +---------------+----------------+----------+
           |                   |                    |
    Stage 3: Mining     Stage 3: Clustering   Stage 4: Classification
-   - FP-Growth rules   - K-Means            - RF, HistGBT, SVC
-   - Co-occurrence     - Hierarchical        - model weights saved
-     network           - DBSCAN              - auto GPU detection
+   - FP-Growth rules   - K-Means            - RF, HistGBT_sklearn (CPU)
+   - Co-occurrence     - Hierarchical        - XGBoost HistGBT (GPU)
+     network           - DBSCAN              - LinearSVC (CPU)
+                                             - model weights saved
 ```
 
 ## the agents
@@ -65,9 +66,20 @@ this is where it gets interesting. we tried a bunch of different feature represe
 
 **combined** -- flat TF-IDF (4000 dense) + semantic (1546) = 5546 dims. **this is our best feature set** because it gets both the lexical signal from TF-IDF and the semantic signal from the transformer
 
+## GPU acceleration
+
+two things use GPU when available:
+
+1. **sentence transformer encoding** -- auto-detects MPS (mac) or CUDA (nvidia). falls back to CPU if nothing found
+2. **XGBoost classification** -- when CUDA GPU is detected, the pipeline asks if you want GPU-only training (XGBoost, ~1 min), CPU-only (sklearn RF+HistGBT+SVC, ~10 min), or both. sklearn classifiers dont have GPU support so thats the bottleneck
+
+our best result (0.810 macro-F1) came from sklearn HistGBT on CPU. XGBoost GPU gets ~0.789 -- slightly lower because the implementations differ internally. we keep both options because GPU is way faster for iteration but CPU gives the best final numbers
+
 ## model weight saving
 
 after training, all fitted classifiers get saved to `data/processed/models/trained_classifiers.pkl`. next time you run the pipeline it asks if you want to reuse those weights or train fresh. you can also do `--stage predict` to just load weights and evaluate instantly without any training at all.
+
+we also have pre-trained weights on [Dropbox](https://www.dropbox.com/scl/fo/0qtdqh2oa0ivsdro3hq1k/AIMU_1WjQov9Up4rsgdcIjY?rlkey=ulkfda1xyrpjyr01n9x0rg76w&st=8rkk1fu2&dl=0) that give the 0.810 result right out of the box
 
 ## files
 
