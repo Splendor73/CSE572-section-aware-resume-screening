@@ -1,6 +1,4 @@
-"""
-Skill co-occurrence network (NetworkX).
-"""
+# networkx skill graph
 
 import networkx as nx
 import pandas as pd
@@ -60,7 +58,7 @@ def save_graph_viz(G, output_path=None, top_n=50):
     sub = G.subgraph(top_nodes)
 
     fig, ax = plt.subplots(figsize=(14,12))
-    pos = nx.spring_layout(sub, k=2, seed=42, iterations=50)
+    pos = nx.spring_layout(sub, k=2, seed=42, iterations=50)  # layout
 
     node_sizes = [degrees.get(n, 1) * 30 for n in sub.nodes()]
     edge_weights = [sub[u][v].get("weight", 1) for u, v in sub.edges()]

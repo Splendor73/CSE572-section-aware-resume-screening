@@ -1,6 +1,4 @@
-"""
-Clustering: K-Means, Hierarchical, DBSCAN with SVD reduction.
-"""
+# kmeans etc
 
 import numpy as np
 import pandas as pd
@@ -21,31 +19,32 @@ results_dir = Path(__file__).resolve().parents[2] / "results"
 def reduce_dimensions(X, n_components=50):
     svd = TruncatedSVD(n_components=n_components, random_state=42)
     X_red = svd.fit_transform(X)
-    explained = svd.explained_variance_ratio_.sum()
-    print(f"  SVD to {n_components} dims, explained variance: {explained:.3f}")
+    ev = svd.explained_variance_ratio_.sum()
+    print(f"  SVD to {n_components} dims, explained variance: {ev:.3f}")
     X_red = StandardScaler().fit_transform(X_red)
     return X_red
 
 
 def run_kmeans(X, y_true, k_range=range(5, 35, 5)):
-    res = []
+    results = []
     for k in k_range:
-        km = KMeans(n_clusters=k, random_state=42, n_init=10, max_iter=300)
+        km     = KMeans(n_clusters=k, random_state=42, n_init=10, max_iter=300)
         labels = km.fit_predict(X)
-        sil = silhouette_score(X, labels, sample_size=min(2000, len(X)))
-        nmi = normalized_mutual_info_score(y_true, labels)
-        ari = adjusted_rand_score(y_true, labels)
-        res.append({"k": k, "silhouette": sil, "nmi": nmi, "ari": ari})
+        sil    = silhouette_score(X, labels, sample_size=min(2000, len(X)))
+        nmi    = normalized_mutual_info_score(y_true, labels)
+        ari    = adjusted_rand_score(y_true, labels)
         print(f"    K={k}: silhouette={sil:.4f}, NMI={nmi:.4f}, ARI={ari:.4f}")
-    return res
+        results.append({"k": k, "silhouette": sil, "nmi": nmi, "ari": ari})
+    return results
 
 
 def run_hierarchical(X, y_true, n_clusters=24):
-    agg = AgglomerativeClustering(n_clusters=n_clusters, linkage="ward")
-    labels = agg.fit_predict(X)
-    sil = silhouette_score(X, labels, sample_size=min(2000, len(X)))
-    nmi = normalized_mutual_info_score(y_true, labels)
-    ari = adjusted_rand_score(y_true, labels)
+    """ward linkage, fixed k=24 to match category count"""
+    agg    = AgglomerativeClustering(n_clusters=n_clusters, linkage="ward")
+    lbl    = agg.fit_predict(X)
+    sil    = silhouette_score(X, lbl, sample_size=min(2000, len(X)))
+    nmi    = normalized_mutual_info_score(y_true, lbl)
+    ari    = adjusted_rand_score(y_true, lbl)
     print(f"  Hierarchical (k={n_clusters}): silhouette={sil:.4f}, NMI={nmi:.4f}, ARI={ari:.4f}")
     return {"method": "Hierarchical", "k": n_clusters, "silhouette": sil, "nmi": nmi, "ari": ari}
 
@@ -62,7 +61,8 @@ def run_dbscan(X, y_true, eps_range=(3.0, 4.0, 5.0, 6.0, 8.0)):
             sil = silhouette_score(X[mask], labels[mask], sample_size=min(2000, mask.sum()))
             nmi = normalized_mutual_info_score(y_true, labels)
         else:
-            sil = -1; nmi = 0
+            sil = -1
+            nmi = 0
         ari = adjusted_rand_score(y_true, labels)
         res.append({"eps": eps, "n_clusters": n_clusters, "n_noise": n_noise,
                      "silhouette": sil, "nmi": nmi, "ari": ari})
@@ -108,8 +108,9 @@ def run_all_clustering(X_flat, X_section, y_true, label_encoder):
         for r in db_res:
             all_results.append({"mode": mode, "method": "DBSCAN", **r})
 
-        best_k = max(km_res, key=lambda r: r["silhouette"])["k"]
+        best_k  = max(km_res, key=lambda r: r["silhouette"])["k"]
         km_best = KMeans(n_clusters=best_k, random_state=42, n_init=10).fit(X_dense)
+        print(f"  best k by silhouette: {best_k}")
 
         plot_tsne(X_dense, km_best.labels_, "cluster",
                   f"t-SNE: {mode} K-Means (k={best_k})",

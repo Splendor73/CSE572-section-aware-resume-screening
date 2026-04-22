@@ -1,31 +1,29 @@
-"""
-Section-Aware Multi-Agent Resume Screening Pipeline
-Main entry point.
-"""
+# main entry — resume pipeline
 
 import argparse
 import pickle
 import sys
 from pathlib import Path
 
-_project_root = str(Path(__file__).resolve().parents[1])
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
+_root = str(Path(__file__).resolve().parents[1])
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 
+# paths
 project_root = Path(__file__).resolve().parents[1]
 processed_dir = project_root / "data" / "processed"
 results_dir = project_root / "results"
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Section-Aware Multi-Agent Resume Screening Pipeline"
+    p = argparse.ArgumentParser(description="CSE572 resume pipeline")
+    p.add_argument(
+        "--stage",
+        choices=["parsing", "features", "mining", "classification", "predict", "all"],
+        default="all",
+        help="which part to run",
     )
-    parser.add_argument(
-        "--stage", choices=["parsing", "features", "mining", "classification", "predict", "all"],
-        default="all", help="Pipeline stage to run (default: all)",
-    )
-    return parser.parse_args()
+    return p.parse_args()
 
 
 def run_parsing():
@@ -139,13 +137,14 @@ def run_classification(features=None):
     }
     combined, predictions, trained_models = compare_feature_sets(feature_sets, features["labels"])
 
-    # save trained models for quick re-use (already fitted, no retraining)
-    import pickle as _pkl
-    models_dir = processed_dir / "models"
-    models_dir.mkdir(parents=True, exist_ok=True)
-    with open(models_dir / "trained_classifiers.pkl", "wb") as f:
-        _pkl.dump(trained_models, f)
-    print(f"Saved {len(trained_models)} trained models to {models_dir / 'trained_classifiers.pkl'}")
+    # dump fitted models
+    import pickle as pkl
+    mdir = processed_dir / "models"
+    mdir.mkdir(parents = True, exist_ok = True)
+    with open(mdir / "trained_classifiers.pkl", "wb") as fh:
+        pkl.dump(trained_models, fh)
+    out = mdir / "trained_classifiers.pkl"
+    print(f"Saved {len(trained_models)} trained models to {out}")
 
     save_results_table(combined)
     plot_comparison_bar(combined, metric="macro_f1")
@@ -165,7 +164,6 @@ def run_classification(features=None):
 
 
 def run_predict():
-    """Try to load saved weights. If missing, tell user their options."""
     print("\n" + "="*60)
     print("Quick predict: looking for saved model weights...")
     print("="*60)
@@ -213,22 +211,22 @@ def run_predict():
     all_results = []
     all_predictions = {}
     for key, clf in models.items():
-        # find which classifier name is in the key
-        name = next((c for c in clf_names if key.endswith("_" + c)), None)
-        if name is None:
+        match = next((c for c in clf_names if key.endswith("_" + c)), None)
+        if match is None:
             continue
+        name = match
         mode = key[: -(len(name) + 1)]
         if mode not in features:
             continue
-        X_test = features[mode]["X_test"]
-        if name in ("HistGBT", "HistGBT_sklearn") and issparse(X_test):
-            X_test = X_test.toarray()
-        y_pred = clf.predict(X_test)
-        m = compute_classification_metrics(y_test, y_pred)
+        X_te = features[mode]["X_test"]
+        if name in ("HistGBT", "HistGBT_sklearn") and issparse(X_te):
+            X_te = X_te.toarray()
+        y_hat = clf.predict(X_te)
+        m = compute_classification_metrics(y_test, y_hat)
         m["classifier"] = name
         m["mode"] = mode
         all_results.append(m)
-        all_predictions[key] = y_pred
+        all_predictions[key] = y_hat
         print(f"  {key:<35s} acc={m['accuracy']:.4f}  macro-F1={m['macro_f1']:.4f}")
 
     # save results, plots, confusion matrix
@@ -249,7 +247,7 @@ def run_predict():
 
 def main():
     args = parse_args()
-    splits = None; features = None
+    splits, features = None, None
 
     if args.stage in ("parsing", "all"):
         splits = run_parsing()

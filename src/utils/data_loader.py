@@ -1,8 +1,5 @@
-"""
-Dataset loader for Resume Screening project.
-"""
+# load csv splits for 572 project
 
-import os
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -14,10 +11,8 @@ processed_dir = project_root / "data" / "processed"
 
 
 def load_primary_dataset(path=None):
-    """Load the resume dataset (2484 resumes, 24 categories)."""
     if path is None:
         path = raw_dir / "UpdatedResumeDataSet.csv"
-
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(
@@ -65,14 +60,19 @@ def load_secondary_dataset(path=None):
 
 
 def split_dataset(df, test_size=0.15, val_size=0.15, random_state=42):
-    """70/15/15 stratified split."""
+    rs = random_state
     train_df, test_df = train_test_split(
-        df, test_size=test_size, stratify=df["Category"], random_state=random_state,
+        df,
+        test_size=test_size,
+        stratify=df["Category"],
+        random_state=rs,
     )
-
     val_frac = val_size / (1 - test_size)
     train_df, val_df = train_test_split(
-        train_df, test_size=val_frac, stratify=train_df["Category"], random_state=random_state,
+        train_df,
+        test_size=val_frac,
+        stratify=train_df["Category"],
+        random_state=rs,
     )
 
     print(f"Split sizes — train: {len(train_df)}, val: {len(val_df)}, test: {len(test_df)}")

@@ -1,7 +1,4 @@
-"""
-Section agents for processing resume text.
-Each one handles a different resume section (Skills, Experience, Education).
-"""
+# section agents (skills / exp / education)
 
 import re
 import nltk
@@ -12,8 +9,7 @@ from nltk.tokenize import word_tokenize
 stop_words = set(stopwords.words("english"))
 lemmatizer = WordNetLemmatizer()
 
-# synonym mappings - normalizes different ways people write the same skill
-SKILL_SYNONYMS = {
+synonyms = {
     "js": "javascript", "node": "nodejs", "node.js": "nodejs",
     "react.js": "reactjs", "reactjs": "reactjs", "vue.js": "vuejs",
     "angular.js": "angularjs", "express.js": "expressjs",
@@ -56,6 +52,7 @@ SKILL_SYNONYMS = {
     "crm": "customer relationship management",
     "erp": "enterprise resource planning", "sap": "sap",
 }
+SKILL_SYNONYMS = synonyms
 
 degree_patterns = [
     (r"\b(?:ph\.?d|doctorate|doctoral)\b", "phd"),
@@ -74,8 +71,6 @@ years_exp_patterns = [
 
 
 class BaseAgent:
-    """Shared text preprocessing."""
-
     def process(self, text):
         if not text or not isinstance(text, str):
             return []
@@ -92,10 +87,7 @@ class BaseAgent:
 class SkillsAgent(BaseAgent):
     def process(self, text):
         toks = super().process(text)
-        normalized = []
-        for t in toks:
-            normalized.append(SKILL_SYNONYMS.get(t, t))
-        return normalized
+        return [synonyms.get(t, t) for t in toks]
 
     def extract_skill_set(self, text):
         return set(self.process(text))
@@ -106,14 +98,12 @@ class ExperienceAgent(BaseAgent):
         return super().process(text)
 
     def extract_years_experience(self, text):
-        if not text:
-            return 0
-        yrs = []
-        text_lower = text.lower()
-        for pat in years_exp_patterns:
-            matches = re.findall(pat, text_lower)
-            yrs.extend(int(m) for m in matches)
-        return max(yrs) if yrs else 0
+        if not text: return 0
+        tl = text.lower()
+        found = []
+        for p in years_exp_patterns:
+            found += [int(m) for m in re.findall(p, tl)]
+        return max(found) if found else 0
 
 
 class EducationAgent(BaseAgent):
@@ -121,7 +111,6 @@ class EducationAgent(BaseAgent):
         return super().process(text)
 
     def detect_degree_level(self, text):
-        """Returns highest degree found."""
         if not text:
             return "unknown"
         text_lower = text.lower()
@@ -132,7 +121,6 @@ class EducationAgent(BaseAgent):
 
 
 def process_all_sections(df):
-    """Run all 3 agents on the parsed sections."""
     skills_agent = SkillsAgent()
     exp_agent = ExperienceAgent()
     edu_agent = EducationAgent()
@@ -148,13 +136,12 @@ def process_all_sections(df):
     df["num_skills"] = df["skills_tokens"].apply(len)
 
     print(f"\nAgent processing complete:")
-    print(f"  Avg skills tokens:     {df['num_skills'].mean():.1f}")
-    print(f"  Avg experience tokens: {df['experience_tokens'].apply(len).mean():.1f}")
-    print(f"  Avg education tokens:  {df['education_tokens'].apply(len).mean():.1f}")
-    print(f"  Years exp detected:    {(df['years_experience'] > 0).sum()} / {len(df)}")
-    print(f"  Degree distribution:")
-    for level, count in df["degree_level"].value_counts().items():
-        print(f"    {level:<15s} {count:>5d}")
+    print(f"  avg skills tokens:     {df['num_skills'].mean():.1f}")
+    print(f"  avg experience tokens: {df['experience_tokens'].apply(len).mean():.1f}")
+    print(f"  avg education tokens:  {df['education_tokens'].apply(len).mean():.1f}")
+    print(f"  years exp found in {(df['years_experience'] > 0).sum()} / {len(df)} resumes")
+    for lvl, cnt in df["degree_level"].value_counts().items():
+        print(f"    {lvl:<15s} {cnt}")
 
     return df
 

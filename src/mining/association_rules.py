@@ -1,6 +1,4 @@
-"""
-Association rule mining on skill sets (FP-Growth).
-"""
+# fp growth on skills
 
 import pandas as pd
 import numpy as np
@@ -11,7 +9,6 @@ results_dir = Path(__file__).resolve().parents[2] / "results"
 
 
 def build_skill_transactions(df, top_n=300):
-    """One-hot encode top skills from skills_tokens."""
     from collections import Counter
 
     all_skills = Counter()

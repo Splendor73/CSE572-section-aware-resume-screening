@@ -1,6 +1,4 @@
-"""
-Evaluation metrics and plotting.
-"""
+# metrics + plots
 
 import numpy as np
 import pandas as pd
@@ -23,22 +21,24 @@ results_dir = Path(__file__).resolve().parents[2] / "results"
 
 
 def compute_classification_metrics(y_true, y_pred):
-    return {
-        "accuracy": accuracy_score(y_true, y_pred),
-        "macro_f1": f1_score(y_true, y_pred, average="macro", zero_division=0),
-        "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
-        "macro_precision": precision_score(y_true, y_pred, average="macro", zero_division=0),
-        "macro_recall": recall_score(y_true, y_pred, average="macro", zero_division=0),
-    }
+    acc = accuracy_score(y_true, y_pred)
+    mf1 = f1_score(y_true, y_pred, average="macro", zero_division=0)
+    bacc = balanced_accuracy_score(y_true, y_pred)
+    mp = precision_score(y_true, y_pred, average="macro", zero_division=0)
+    mr = recall_score(y_true, y_pred, average="macro", zero_division=0)
+    return {"accuracy": acc, "macro_f1": mf1, "balanced_accuracy": bacc,
+            "macro_precision": mp, "macro_recall": mr}
 
 
 def plot_confusion_matrix(y_true, y_pred, class_names, title="Confusion Matrix", output_path=None):
     cm = confusion_matrix(y_true, y_pred)
-    fig, ax = plt.subplots(figsize=(14, 12))
+    fig, ax = plt.subplots(figsize=(14,12))
 
     if sns is not None:
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                    xticklabels=class_names, yticklabels=class_names, ax=ax)
+        sns.heatmap(
+            cm, annot=True, fmt="d", cmap="Blues",
+            xticklabels=class_names, yticklabels=class_names, ax=ax,
+        )
     else:
         img = ax.imshow(cm, cmap="Blues")
         fig.colorbar(img, ax=ax)

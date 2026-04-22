@@ -1,6 +1,4 @@
-"""
-Classification module - train classifiers across multiple feature sets.
-"""
+# classifiers for all feature branches
 
 import json
 import numpy as np
@@ -39,10 +37,8 @@ def _detect_gpu():
 def _make_xgb_classifier(device="cpu", **kwargs):
     from xgboost import XGBClassifier
     return XGBClassifier(
-        n_estimators=500, max_depth=8, learning_rate=0.1,
-        min_child_weight=5, random_state=42,
-        device=device, tree_method="hist",
-        verbosity=0, **kwargs
+        n_estimators=500, max_depth=8, learning_rate=0.1, min_child_weight=5, random_state=42,
+        device=device, tree_method="hist", verbosity=0, **kwargs
     )
 
 
@@ -90,16 +86,15 @@ def get_classifiers(mode=None):
 
     if mode in ("cpu", "both"):
         clfs["RandomForest"] = RandomForestClassifier(
-            n_estimators=300, class_weight="balanced", random_state=42, n_jobs=-1
+            n_estimators=300, class_weight="balanced", random_state=42, n_jobs=-1,
         )
-        clfs["HistGBT_sklearn"] = HistGradientBoostingClassifier(
-            max_iter=500, max_depth=8, learning_rate=0.1,
-            min_samples_leaf=5, random_state=42
+        hgb = HistGradientBoostingClassifier(
+            max_iter=500, max_depth=8, learning_rate=0.1, min_samples_leaf=5, random_state=42,
         )
-        clfs["LinearSVC"] = Pipeline([
-            ("scaler", MaxAbsScaler()),
-            ("svc", LinearSVC(max_iter=50000, class_weight="balanced", random_state=42)),
-        ])
+        clfs["HistGBT_sklearn"] = hgb
+        clfs["LinearSVC"] = Pipeline(
+            [("scaler", MaxAbsScaler()), ("svc", LinearSVC(max_iter=50000, class_weight="balanced", random_state=42))],
+        )
 
     if mode in ("gpu", "both") and use_gpu:
         try:
@@ -125,22 +120,17 @@ def get_classifiers(mode=None):
 
 
 def _apply_smote(X_train, y_train):
-    if SMOTE is None:
-        return X_train, y_train
-    min_count = pd.Series(y_train).value_counts().min()
-    k = min(5, min_count - 1)
-    if k < 1:
-        return X_train, y_train
-    sm = SMOTE(random_state=42, k_neighbors=k)
-    return sm.fit_resample(X_train, y_train)
-
-
-_smote_skip = {"HistGBT", "HistGBT_sklearn"}
+    if SMOTE is None: return X_train, y_train
+    min_c = pd.Series(y_train).value_counts().min()
+    k = min(5, min_c - 1)
+    if k < 1: return X_train, y_train
+    return SMOTE(random_state=42, k_neighbors=k).fit_resample(X_train, y_train)
 
 
 def train_and_evaluate(X_train, y_train, X_test, y_test, clf, name="", use_smote=True):
     is_ensemble = isinstance(clf, VotingClassifier)
-    if use_smote and not is_ensemble and name not in _smote_skip:
+    skip_resample = name in ("HistGBT", "HistGBT_sklearn")
+    if use_smote and (not is_ensemble) and (not skip_resample):
         X_train, y_train = _apply_smote(X_train, y_train)
     clf.fit(X_train, y_train)
     y_pred = clf.predict(X_test)
@@ -150,26 +140,21 @@ def train_and_evaluate(X_train, y_train, X_test, y_test, clf, name="", use_smote
 
 
 def get_tuning_grids():
+    rf_grids = [
+        {"n_estimators": 300, "max_depth": None},
+        {"n_estimators": 500, "max_depth": None},
+    ]
+    hgb_grids = [
+        {"max_iter": 500, "max_depth": 8,  "learning_rate": 0.1,  "min_samples_leaf": 5},
+        {"max_iter": 500, "max_depth": 10, "learning_rate": 0.05, "min_samples_leaf": 5},
+        {"max_iter": 800, "max_depth": 8,  "learning_rate": 0.05, "min_samples_leaf": 3},
+        {"max_iter": 800, "max_depth": 12, "learning_rate": 0.03, "min_samples_leaf": 5},
+    ]
     return {
-        "RandomForest": [
-            {"n_estimators": 300, "max_depth": None},
-            {"n_estimators": 500, "max_depth": None},
-        ],
-        "HistGBT": [
-            {"max_depth": 8, "learning_rate": 0.1},
-            {"max_depth": 10, "learning_rate": 0.05},
-        ],
-        "HistGBT_sklearn": [
-            {"max_iter": 500, "max_depth": 8, "learning_rate": 0.1, "min_samples_leaf": 5},
-            {"max_iter": 500, "max_depth": 10, "learning_rate": 0.05, "min_samples_leaf": 5},
-            {"max_iter": 800, "max_depth": 8, "learning_rate": 0.05, "min_samples_leaf": 3},
-            {"max_iter": 800, "max_depth": 12, "learning_rate": 0.03, "min_samples_leaf": 5},
-        ],
-        "LinearSVC": [
-            {"svc__C": 0.5},
-            {"svc__C": 1.0},
-            {"svc__C": 2.0},
-        ],
+        "RandomForest":  rf_grids,
+        "HistGBT":       [{"max_depth": 8, "learning_rate": 0.1}, {"max_depth": 10, "learning_rate": 0.05}],
+        "HistGBT_sklearn": hgb_grids,
+        "LinearSVC":     [{"svc__C": 0.5}, {"svc__C": 1.0}, {"svc__C": 2.0}],
     }
 
 
@@ -194,12 +179,10 @@ def _combine_splits(X_train, y_train, X_val=None, y_val=None):
 
 
 def _prepare_inputs_for_model(name, X_train, X_eval, clf=None):
-    """Convert to dense for models that need it. XGBoost handles sparse fine."""
-    if name == "HistGBT_sklearn":
-        X_tr = X_train.toarray() if issparse(X_train) else np.asarray(X_train)
-        X_ev = X_eval.toarray() if issparse(X_eval) else np.asarray(X_eval)
-        return X_tr, X_ev
-    return X_train, X_eval
+    if name != "HistGBT_sklearn":
+        return X_train, X_eval
+    to_arr = lambda X: X.toarray() if issparse(X) else np.asarray(X)
+    return to_arr(X_train), to_arr(X_eval)
 
 
 def _score_tuple(m):
@@ -207,19 +190,17 @@ def _score_tuple(m):
 
 
 def _select_params_on_validation(name, clf, X_train, y_train, X_val, y_val):
+    """grid search on validation, returns best params + metrics"""
     grids = get_tuning_grids().get(name, [{}])
-    best_params = {}; best_metrics = None
-
+    best_p, best_m = {}, None
     for params in grids:
-        candidate = clone(clf)
-        if params: candidate.set_params(**params)
-        X_fit, X_eval = _prepare_inputs_for_model(name, X_train, X_val, clf=candidate)
-        metrics, _ = train_and_evaluate(X_fit, y_train, X_eval, y_val, candidate, name, use_smote=False)
-        if best_metrics is None or _score_tuple(metrics) > _score_tuple(best_metrics):
-            best_params = params
-            best_metrics = metrics
-
-    return best_params, best_metrics
+        cand = clone(clf)
+        if params: cand.set_params(**params)
+        Xfit, Xev = _prepare_inputs_for_model(name, X_train, X_val, clf=cand)
+        m, _ = train_and_evaluate(Xfit, y_train, Xev, y_val, cand, name, use_smote=False)
+        if best_m is None or _score_tuple(m) > _score_tuple(best_m):
+            best_p = params; best_m = m
+    return best_p, best_m
 
 
 def run_all_classifiers(X_train, y_train, X_test, y_test, mode="flat", X_val=None, y_val=None, trained_models=None, classifiers=None):
@@ -235,9 +216,11 @@ def run_all_classifiers(X_train, y_train, X_test, y_test, mode="flat", X_val=Non
 
         if has_val:
             sel_params, val_metrics = _select_params_on_validation(
-                name, clf, X_train, y_train, X_val, y_val)
+                name, clf, X_train, y_train, X_val, y_val
+            )
             final_clf = clone(clf)
-            if sel_params: final_clf.set_params(**sel_params)
+            if sel_params:
+                final_clf.set_params(**sel_params)
             X_final, y_final = _combine_splits(X_train, y_train, X_val, y_val)
             X_fit, X_te = _prepare_inputs_for_model(name, X_final, X_test, clf=final_clf)
             metrics, y_pred = train_and_evaluate(X_fit, y_final, X_te, y_test, final_clf, name)
@@ -299,7 +282,6 @@ def compare_feature_sets(feature_sets, labels, classifiers=None):
 
 
 def save_trained_models(feature_sets, labels):
-    """Train all classifiers and save them to disk for quick re-use."""
     import pickle
     from pathlib import Path
 
@@ -323,7 +305,7 @@ def save_trained_models(feature_sets, labels):
                 final_clf = clone(clf)
                 X_final, y_final = features["X_train"], labels["y_train"]
 
-            if name not in _smote_skip:
+            if name not in ("HistGBT", "HistGBT_sklearn"):
                 X_final, y_final = _apply_smote(X_final, y_final)
             X_fit = X_final.toarray() if issparse(X_final) and name in ("HistGBT",) else X_final
             final_clf.fit(X_fit, y_final)

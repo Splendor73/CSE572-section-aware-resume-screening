@@ -1,7 +1,4 @@
-"""
-HTML section parser for resumes.
-Pulls out Skills, Experience, Education from Resume_html using BeautifulSoup.
-"""
+# html -> skills / experience / education text
 
 from bs4 import BeautifulSoup
 import re
@@ -26,7 +23,6 @@ section_keywords = {
     ],
 }
 
-# keep old name around for imports
 SECTION_KEYWORDS = section_keywords
 
 
@@ -47,7 +43,6 @@ def _get_section_text(section_div):
 
 
 def parse_resume_html(html_str):
-    """Parse one resume HTML into section texts."""
     result = {"skills": "", "experience": "", "education": "", "other": ""}
 
     if not html_str or not isinstance(html_str, str):
@@ -90,7 +85,6 @@ def parse_resume_html(html_str):
 
 
 def parse_all_resumes(df):
-    """Parse all resumes, add section columns to df."""
     parsed = df["Resume_html"].apply(parse_resume_html)
 
     df = df.copy()

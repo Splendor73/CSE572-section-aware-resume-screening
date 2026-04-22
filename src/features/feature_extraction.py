@@ -1,6 +1,4 @@
-"""
-Feature extraction - flat TF-IDF, section-aware, semantic embeddings, etc.
-"""
+# tfidf + sbert + hybrid stuff
 
 import re
 import numpy as np
@@ -24,20 +22,15 @@ except (ModuleNotFoundError, OSError):
 
 
 def _tokens_to_text(tokens_series):
-    return tokens_series.apply(
-        lambda toks: " ".join(toks) if isinstance(toks, list) else ""
-    )
+    return tokens_series.apply(lambda toks: " ".join(toks) if isinstance(toks, list) else "")
 
 
 def build_flat_tfidf(train_df, val_df, test_df, max_features=8000):
-    vec = TfidfVectorizer(
-        max_features=max_features, sublinear_tf=True,
-        min_df=2, ngram_range=(1, 2), stop_words="english",
-    )
+    vec = TfidfVectorizer(max_features=max_features, sublinear_tf=True,
+                          min_df=2, ngram_range=(1,2), stop_words="english")
     X_train = vec.fit_transform(train_df["Resume_str"].fillna(""))
-    X_val = vec.transform(val_df["Resume_str"].fillna(""))
-    X_test = vec.transform(test_df["Resume_str"].fillna(""))
-
+    X_val   = vec.transform(val_df["Resume_str"].fillna(""))
+    X_test  = vec.transform(test_df["Resume_str"].fillna(""))
     print(f"Flat TF-IDF: {X_train.shape[1]} features")
     return {"X_train": X_train, "X_val": X_val, "X_test": X_test, "vectorizer": vec}
 
@@ -48,8 +41,9 @@ def build_section_tfidf(train_df, val_df, test_df, max_features_per_section=3000
     train_parts = []; val_parts = []; test_parts = []
 
     for sec in sections:
-        v = TfidfVectorizer(max_features=max_features_per_section,
-                            sublinear_tf=True, min_df=2, ngram_range=(1,2))
+        v = TfidfVectorizer(
+            max_features=max_features_per_section, sublinear_tf=True, min_df=2, ngram_range=(1, 2),
+        )
 
         tr_text = _tokens_to_text(train_df[sec])
         va_text = _tokens_to_text(val_df[sec])
@@ -59,7 +53,9 @@ def build_section_tfidf(train_df, val_df, test_df, max_features_per_section=3000
         X_va = v.transform(va_text)
         X_te = v.transform(te_text)
 
-        train_parts.append(X_tr); val_parts.append(X_va); test_parts.append(X_te)
+        train_parts.append(X_tr)
+        val_parts.append(X_va)
+        test_parts.append(X_te)
         vectorizers[sec] = v
         print(f"  {sec}: {X_tr.shape[1]} features")
 
@@ -77,22 +73,16 @@ def build_section_tfidf(train_df, val_df, test_df, max_features_per_section=3000
 
 
 def _fit_lsa_branch(X_train, X_val, X_test, n_components=128, branch_name="feature"):
-    max_rank = min(X_train.shape[0]-1, X_train.shape[1]-1)
-    n_components = max(1, min(n_components, max_rank))
-
-    svd = TruncatedSVD(n_components=n_components, random_state=42)
+    n_components = max(1, min(n_components, min(X_train.shape[0]-1, X_train.shape[1]-1)))
+    svd  = TruncatedSVD(n_components=n_components, random_state=42)
     norm = Normalizer(copy=False)
-
-    X_train_lsa = norm.fit_transform(svd.fit_transform(X_train))
-    X_val_lsa = norm.transform(svd.transform(X_val))
-    X_test_lsa = norm.transform(svd.transform(X_test))
-
-    explained = float(svd.explained_variance_ratio_.sum())
-    print(f"  {branch_name} latent branch: {n_components} dims, explained variance={explained:.3f}")
-    return {
-        "X_train": X_train_lsa, "X_val": X_val_lsa, "X_test": X_test_lsa,
-        "svd": svd, "normalizer": norm, "explained_variance": explained,
-    }
+    Xtr  = norm.fit_transform(svd.fit_transform(X_train))
+    Xva  = norm.transform(svd.transform(X_val))
+    Xte  = norm.transform(svd.transform(X_test))
+    ev = float(svd.explained_variance_ratio_.sum())
+    print(f"  {branch_name} latent branch: {n_components} dims, explained variance={ev:.3f}")
+    return {"X_train": Xtr, "X_val": Xva, "X_test": Xte,
+            "svd": svd, "normalizer": norm, "explained_variance": ev}
 
 
 def build_hybrid_features(flat_features, section_features, latent_components=128):
@@ -120,20 +110,17 @@ def build_hybrid_features(flat_features, section_features, latent_components=128
 
 
 def _detect_seniority(text):
-    txt = text.lower() if isinstance(text, str) else ""
-    levels = [
-        (7, r"\b(vp|vice\s*president|c[eo]o|cto|cfo)\b"),
-        (6, r"\b(director)\b"),
-        (5, r"\b(manager|management)\b"),
-        (4, r"\b(lead|principal|staff)\b"),
-        (3, r"\b(senior|sr\.?)\b"),
-        (2, r"\b(associate|mid[- ]level)\b"),
-        (1, r"\b(junior|jr\.?|entry[- ]level)\b"),
-        (0, r"\b(intern|trainee|apprentice)\b"),
-    ]
-    for score, pat in levels:
-        if re.search(pat, txt):
-            return score
+    if not isinstance(text, str):
+        return 0
+    t = text.lower()
+    if re.search(r"\b(vp|vice\s*president|c[eo]o|cto|cfo)\b", t): return 7
+    if re.search(r"\b(director)\b", t):                              return 6
+    if re.search(r"\b(manager|management)\b", t):                   return 5
+    if re.search(r"\b(lead|principal|staff)\b", t):                 return 4
+    if re.search(r"\b(senior|sr\.?)\b", t):                         return 3
+    if re.search(r"\b(associate|mid[- ]level)\b", t):               return 2
+    if re.search(r"\b(junior|jr\.?|entry[- ]level)\b", t):         return 1
+    if re.search(r"\b(intern|trainee|apprentice)\b", t):            return 0
     return 0
 
 
@@ -147,18 +134,18 @@ def _count_ner_entities(text):
 
 
 def _get_handcrafted(df):
-    degree_map = {"unknown": 0, "high_school": 1, "diploma": 2,
-                  "associates": 3, "bachelors": 4, "masters": 5, "phd": 6}
+    deg = {"unknown": 0, "high_school": 1, "diploma": 2,
+           "associates": 3, "bachelors": 4, "masters": 5, "phd": 6}
 
-    base = np.column_stack([
-        df["years_experience"].fillna(0).values.astype(float),
-        df["degree_level"].map(degree_map).fillna(0).values.astype(float),
-        df["num_skills"].fillna(0).values.astype(float),
-        df["skills_tokens"].apply(lambda x: len(x) if isinstance(x, list) else 0).values.astype(float),
-        df["experience_tokens"].apply(lambda x: len(x) if isinstance(x, list) else 0).values.astype(float),
-        df["education_tokens"].apply(lambda x: len(x) if isinstance(x, list) else 0).values.astype(float),
-        df["Resume_str"].fillna("").apply(len).values.astype(float),
-    ])
+    yrs   = df["years_experience"].fillna(0).values.astype(float)
+    deglv = df["degree_level"].map(deg).fillna(0).values.astype(float)
+    nsk   = df["num_skills"].fillna(0).values.astype(float)
+    sk_len  = df["skills_tokens"].apply(lambda x: len(x) if isinstance(x, list) else 0).values.astype(float)
+    ex_len  = df["experience_tokens"].apply(lambda x: len(x) if isinstance(x, list) else 0).values.astype(float)
+    edu_len = df["education_tokens"].apply(lambda x: len(x) if isinstance(x, list) else 0).values.astype(float)
+    res_len = df["Resume_str"].fillna("").apply(len).values.astype(float)
+
+    base = np.column_stack([yrs, deglv, nsk, sk_len, ex_len, edu_len, res_len])
 
     seniority = df["Resume_str"].fillna("").apply(_detect_seniority).values.astype(float).reshape(-1,1)
 
@@ -177,7 +164,6 @@ def _get_handcrafted(df):
 
 
 def _get_device():
-    """Auto-detect best available device: CUDA > MPS > CPU."""
     import torch
     if torch.cuda.is_available():
         print(f"  Using GPU: {torch.cuda.get_device_name(0)}")
@@ -191,7 +177,6 @@ def _get_device():
 
 
 def build_semantic_features(train_df, val_df, test_df, model_name="all-MiniLM-L6-v2"):
-    """Dense embeddings from Sentence Transformers per section."""
     if SentenceTransformer is None:
         print("sentence-transformers not available, skipping semantic features")
         return None
@@ -249,16 +234,20 @@ def encode_labels(train_df, val_df, test_df):
 
 
 def _apply_feature_selection(feat_dict, y_train, k=3000, name="features"):
-    actual_k = min(k, feat_dict["X_train"].shape[1])
-    sel = SelectKBest(chi2, k=actual_k)
-    X_tr = sel.fit_transform(feat_dict["X_train"], y_train)
-    X_va = sel.transform(feat_dict["X_val"])
-    X_te = sel.transform(feat_dict["X_test"])
-    print(f"  {name}: {feat_dict['X_train'].shape[1]} -> {X_tr.shape[1]} features (chi2)")
-    out = dict(feat_dict)
-    out["X_train"] = X_tr; out["X_val"] = X_va; out["X_test"] = X_te
-    out["selector"] = sel
-    return out
+    k2  = min(k, feat_dict["X_train"].shape[1])
+    sel = SelectKBest(chi2, k=k2)
+
+    Xtr = sel.fit_transform(feat_dict["X_train"], y_train)
+    Xva = sel.transform(feat_dict["X_val"])
+    Xte = sel.transform(feat_dict["X_test"])
+
+    print(f"  {name}: {feat_dict['X_train'].shape[1]} -> {Xtr.shape[1]} features (chi2)")
+    d = dict(feat_dict)
+    d["X_train"] = Xtr
+    d["X_val"]   = Xva
+    d["X_test"]  = Xte
+    d["selector"] = sel
+    return d
 
 
 def _build_combined(flat_features, semantic_features):
@@ -274,8 +263,6 @@ def _build_combined(flat_features, semantic_features):
 
 
 def get_feature_matrices(train_df, val_df, test_df):
-    """Build all feature sets + labels."""
-
     print("\n--- Building flat TF-IDF ---")
     flat = build_flat_tfidf(train_df, val_df, test_df)
 
