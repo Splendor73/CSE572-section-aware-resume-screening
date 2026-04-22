@@ -1,12 +1,14 @@
 # Data
 data/raw/
 data/processed/
+data/extras/
 *.csv
 *.json
 *.xlsx
 
 # Python
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *.egg-info/
 dist/
@@ -22,12 +24,14 @@ venv/
 .vscode/
 .idea/
 
-# Claude Code
-CLAUDE.md
-
 # OS
 .DS_Store
 Thumbs.db
+
+# Local tooling
+.claude/
+.gemini/
+graphify-out/
 
 # Results (keep structure, ignore large outputs)
 results/*.pkl
@@ -35,8 +39,3 @@ results/*.joblib
 
 # Environment
 .env
-AGENTS.md
-graphify-out/graph.html
-
-graphify-out/.graphify_python
-graphify-out/GRAPH_REPORT.md

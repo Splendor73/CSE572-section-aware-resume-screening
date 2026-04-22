@@ -11,3 +11,6 @@ seaborn>=0.13
 jupyter>=1.0
 pytest>=7.4
 lxml>=4.9
+sentence-transformers>=2.2.0
+imbalanced-learn>=0.11.0
+scipy>=1.10

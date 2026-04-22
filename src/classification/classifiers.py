@@ -272,13 +272,14 @@ def run_all_classifiers(X_train, y_train, X_test, y_test, mode="flat", X_val=Non
     return pd.DataFrame(results), predictions
 
 
-def compare_feature_sets(feature_sets, labels):
+def compare_feature_sets(feature_sets, labels, classifiers=None):
     combined_results = []
     all_predictions = {}
     trained_models = {}
 
-    # ask user once, reuse for all feature sets
-    classifiers = get_classifiers()
+    # ask user once, reuse for all feature sets (pass classifiers= to skip prompt in tests)
+    if classifiers is None:
+        classifiers = get_classifiers()
 
     for mode, features in feature_sets.items():
         print(f"\n=== {mode.replace('_', ' ').title()} Classification ===")
@@ -361,7 +362,7 @@ if __name__ == "__main__":
         for name in ("flat", "section", "hybrid")
         if name in features
     }
-    combined, predictions = compare_feature_sets(feature_sets, features["labels"])
+    combined, predictions, _ = compare_feature_sets(feature_sets, features["labels"])
 
     save_results_table(combined)
     plot_comparison_bar(combined, metric="macro_f1")

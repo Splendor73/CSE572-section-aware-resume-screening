@@ -23,16 +23,16 @@ def _make_dummy_data():
 
 class TestGetClassifiers:
     def test_returns_three(self):
-        clfs = get_classifiers()
+        clfs = get_classifiers(mode="cpu")
         assert len(clfs) == 3
 
     def test_expected_names(self):
-        clfs = get_classifiers()
-        expected = {"RandomForest", "HistGBT", "LinearSVC"}
+        clfs = get_classifiers(mode="cpu")
+        expected = {"RandomForest", "HistGBT_sklearn", "LinearSVC"}
         assert set(clfs.keys()) == expected
 
     def test_all_have_fit_predict(self):
-        for name, clf in get_classifiers().items():
+        for name, clf in get_classifiers(mode="cpu").items():
             assert hasattr(clf, "fit"), f"{name} missing fit()"
             assert hasattr(clf, "predict"), f"{name} missing predict()"
 
@@ -40,7 +40,7 @@ class TestGetClassifiers:
 class TestTrainAndEvaluate:
     def test_returns_metrics_and_predictions(self):
         X_train, y_train, _, _, X_test, y_test = _make_dummy_data()
-        clf = get_classifiers()["RandomForest"]
+        clf = get_classifiers(mode="cpu")["RandomForest"]
         metrics, y_pred = train_and_evaluate(X_train, y_train, X_test, y_test, clf, "RF")
         assert "accuracy" in metrics
         assert "macro_f1" in metrics
@@ -49,7 +49,7 @@ class TestTrainAndEvaluate:
 
     def test_predictions_valid(self):
         X_train, y_train, _, _, X_test, y_test = _make_dummy_data()
-        clf = get_classifiers()["RandomForest"]
+        clf = get_classifiers(mode="cpu")["RandomForest"]
         _, y_pred = train_and_evaluate(X_train, y_train, X_test, y_test, clf, "RF")
         assert set(y_pred).issubset(set(y_train))
 
@@ -57,7 +57,10 @@ class TestTrainAndEvaluate:
 class TestRunAllClassifiers:
     def test_returns_dataframe(self):
         X_train, y_train, _, _, X_test, y_test = _make_dummy_data()
-        results_df, predictions = run_all_classifiers(X_train, y_train, X_test, y_test, mode="test")
+        results_df, predictions = run_all_classifiers(
+            X_train, y_train, X_test, y_test, mode="test",
+            classifiers=get_classifiers(mode="cpu"),
+        )
         assert len(results_df) == 3
         assert "classifier" in results_df.columns
         assert "mode" in results_df.columns
@@ -65,13 +68,16 @@ class TestRunAllClassifiers:
 
     def test_all_classifiers_ran(self):
         X_train, y_train, _, _, X_test, y_test = _make_dummy_data()
-        results_df, predictions = run_all_classifiers(X_train, y_train, X_test, y_test)
+        results_df, predictions = run_all_classifiers(
+            X_train, y_train, X_test, y_test, classifiers=get_classifiers(mode="cpu"),
+        )
         assert len(predictions) == 3
 
     def test_uses_validation_when_available(self):
         X_train, y_train, X_val, y_val, X_test, y_test = _make_dummy_data()
         results_df, _ = run_all_classifiers(
-            X_train, y_train, X_test, y_test, mode="test", X_val=X_val, y_val=y_val
+            X_train, y_train, X_test, y_test, mode="test", X_val=X_val, y_val=y_val,
+            classifiers=get_classifiers(mode="cpu"),
         )
         assert results_df["used_validation"].all()
         assert "selection_macro_f1" in results_df.columns
@@ -88,7 +94,9 @@ class TestCompareFeatureSets:
         }
         labels = {"y_train": y_train, "y_val": y_val, "y_test": y_test}
 
-        results_df, predictions = compare_feature_sets(feature_sets, labels)
+        results_df, predictions, _ = compare_feature_sets(
+            feature_sets, labels, classifiers=get_classifiers(mode="cpu"),
+        )
 
         assert set(results_df["mode"]) == {"flat", "section", "hybrid"}
         assert set(predictions.keys()) == {"flat", "section", "hybrid"}
