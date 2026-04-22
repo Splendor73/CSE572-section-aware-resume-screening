@@ -37,5 +37,11 @@ graphify-out/
 results/*.pkl
 results/*.joblib
 
+# Presentation / course docs (not part of repo)
+*.pdf
+*.txt
+presentation_script.md
+slides_content.md
+
 # Environment
 .env
