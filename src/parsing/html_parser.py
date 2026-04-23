@@ -3,6 +3,7 @@
 from bs4 import BeautifulSoup
 import re
 import pandas as pd
+from typing import Dict, List, Any
 
 # keywords for matching section headers
 section_keywords = {
@@ -26,7 +27,8 @@ section_keywords = {
 SECTION_KEYWORDS = section_keywords
 
 
-def _classify_section(title_text):
+def _classify_section(title_text: str) -> str:
+    """Classify a given section title into a predefined category based on keywords."""
     title_lower = title_text.strip().lower()
     title_clean = re.sub(r"[^a-z\s]", "", title_lower).strip()
     for section, kws in section_keywords.items():
@@ -36,13 +38,23 @@ def _classify_section(title_text):
     return "other"
 
 
-def _get_section_text(section_div):
+def _get_section_text(section_div: Any) -> str:
+    """Extract and clean text content from a BeautifulSoup section div."""
     txt = section_div.get_text(separator=" ", strip=True)
     txt = re.sub(r"\s+", " ", txt).strip()
     return txt
 
 
-def parse_resume_html(html_str):
+def parse_resume_html(html_str: str) -> Dict[str, str]:
+    """
+    Parse a resume HTML string into categorized sections (skills, experience, education).
+    
+    Args:
+        html_str (str): The raw HTML string of the resume.
+        
+    Returns:
+        Dict[str, str]: A dictionary mapping section categories to their text content.
+    """
     result = {"skills": "", "experience": "", "education": "", "other": ""}
 
     if not html_str or not isinstance(html_str, str):
@@ -84,7 +96,16 @@ def parse_resume_html(html_str):
     return result
 
 
-def parse_all_resumes(df):
+def parse_all_resumes(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Apply HTML parsing across the entire dataset to extract structured sections.
+    
+    Args:
+        df (pd.DataFrame): The input dataframe containing a 'Resume_html' column.
+        
+    Returns:
+        pd.DataFrame: A new dataframe augmented with parsed section text columns.
+    """
     parsed = df["Resume_html"].apply(parse_resume_html)
 
     df = df.copy()
