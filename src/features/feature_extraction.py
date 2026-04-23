@@ -114,13 +114,13 @@ def _detect_seniority(text):
         return 0
     t = text.lower()
     if re.search(r"\b(vp|vice\s*president|c[eo]o|cto|cfo)\b", t): return 7
-    if re.search(r"\b(director)\b", t):                              return 6
-    if re.search(r"\b(manager|management)\b", t):                   return 5
-    if re.search(r"\b(lead|principal|staff)\b", t):                 return 4
-    if re.search(r"\b(senior|sr\.?)\b", t):                         return 3
-    if re.search(r"\b(associate|mid[- ]level)\b", t):               return 2
+    if re.search(r"\b(director)\b", t):                            return 6
+    if re.search(r"\b(manager|management)\b", t):                  return 5
+    if re.search(r"\b(lead|principal|staff)\b", t):                return 4
+    if re.search(r"\b(senior|sr\.?)\b", t):                        return 3
+    if re.search(r"\b(associate|mid[- ]level)\b", t):              return 2
     if re.search(r"\b(junior|jr\.?|entry[- ]level)\b", t):         return 1
-    if re.search(r"\b(intern|trainee|apprentice)\b", t):            return 0
+    if re.search(r"\b(intern|trainee|apprentice)\b", t):           return 0
     return 0
 
 
